@@ -31,16 +31,18 @@ enum PaymentMethod {
 }
 
 /// A thing the shop sells, e.g. "iPhone 15 128GB Black" or "20W USB-C charger".
-/// Phones are tracked one unit at a time (by IMEI); accessories by quantity.
+/// With trackImei, stock is the individual Units (one per IMEI); without it,
+/// stock is just `quantity` (always the case for accessories, optional for phones).
 model Product {
   id                String     @id @default(cuid())
   category          Category
+  trackImei         Boolean    @default(true)
   brand             String
   model             String
   storage           String?
   color             String?
   sellPrice         Int
-  /// Accessories only: cost per item and quantity on hand.
+  /// Products without trackImei only: cost per item and quantity on hand.
   costPrice         Int        @default(0)
   quantity          Int        @default(0)
   lowStockThreshold Int        @default(2)

@@ -22,8 +22,8 @@ export async function getStockRows(filter: Prisma.ProductWhereInput = {}) {
 
   return products.map((p) => {
     const group = byProduct.get(p.id);
-    const onHand = p.category === "PHONE" ? (group?._count._all ?? 0) : p.quantity;
-    const stockCost = p.category === "PHONE" ? (group?._sum.costPrice ?? 0) : p.quantity * p.costPrice;
+    const onHand = p.trackImei ? (group?._count._all ?? 0) : p.quantity;
+    const stockCost = p.trackImei ? (group?._sum.costPrice ?? 0) : p.quantity * p.costPrice;
     const { _count, ...product } = p;
     return { ...product, hasSales: _count.saleItems > 0, onHand, stockCost, isLow: onHand <= p.lowStockThreshold };
   });

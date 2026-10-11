@@ -18,8 +18,10 @@ export type SellableUnit = {
   price: number;
 };
 
+/** Anything counted by quantity: accessories, and phones not tracked by IMEI. */
 export type SellableAccessory = {
   kind: "accessory";
+  category: "PHONE" | "ACCESSORY";
   productId: string;
   name: string;
   price: number;
@@ -60,7 +62,7 @@ export async function searchSellable(query: string): Promise<Sellable[]> {
       take: 30,
     }),
     db.product.findMany({
-      where: { category: "ACCESSORY", archived: false, quantity: { gt: 0 }, AND: textMatch },
+      where: { trackImei: false, archived: false, quantity: { gt: 0 }, AND: textMatch },
       take: 15,
     }),
   ]);
@@ -80,6 +82,7 @@ export async function searchSellable(query: string): Promise<Sellable[]> {
     ...accessories.map(
       (p): SellableAccessory => ({
         kind: "accessory",
+        category: p.category,
         productId: p.id,
         name: productName(p),
         price: p.sellPrice,
@@ -142,7 +145,7 @@ export async function createSale(input: SaleInput): Promise<{ saleId?: string; e
           });
         } else {
           const taken = await tx.product.updateMany({
-            where: { id: item.productId, category: "ACCESSORY", archived: false, quantity: { gte: item.quantity } },
+            where: { id: item.productId, trackImei: false, archived: false, quantity: { gte: item.quantity } },
             data: { quantity: { decrement: item.quantity } },
           });
           if (taken.count !== 1) throw new SaleError(t.sell.notEnough);

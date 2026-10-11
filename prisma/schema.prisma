@@ -44,6 +44,9 @@ model Product {
   costPrice         Int        @default(0)
   quantity          Int        @default(0)
   lowStockThreshold Int        @default(2)
+  /// Hidden from stock and selling. Used instead of deleting once a product has sales,
+  /// so sales history keeps pointing at it.
+  archived          Boolean    @default(false)
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   units             Unit[]

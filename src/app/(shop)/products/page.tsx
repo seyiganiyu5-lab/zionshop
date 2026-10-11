@@ -1,21 +1,24 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ActionForm } from "@/components/ActionForm";
 import { PageHeader } from "@/components/PageHeader";
 import { productName } from "@/lib/format";
 import { getI18n } from "@/lib/i18n/server";
 import { getStockRows } from "@/lib/stock";
+import { deleteProduct, restoreProduct } from "./actions";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t.stock.title };
 }
 
-const filterKeys = ["all", "phones", "accessories", "low"] as const;
+const filterKeys = ["all", "phones", "accessories", "low", "archived"] as const;
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
   const { t, fmt } = await getI18n();
   const { show = "all" } = await searchParams;
   const category = show === "phones" ? "PHONE" : show === "accessories" ? "ACCESSORY" : undefined;
-  let rows = await getStockRows(category ? { category } : {});
+  const archived = show === "archived";
+  let rows = await getStockRows(archived ? { archived: true } : category ? { category } : {});
   if (show === "low") rows = rows.filter((r) => r.isLow);
 
   const totalUnits = rows.reduce((s, r) => s + r.onHand, 0);
@@ -44,10 +47,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <div className="card overflow-x-auto p-0">
         {rows.length === 0 ? (
           <p className="p-6 text-center text-muted">
-            {t.stock.empty}{" "}
-            <Link href="/products/new" className="link">
-              {t.stock.addFirst}
-            </Link>
+            {archived ? (
+              t.stock.archivedEmpty
+            ) : (
+              <>
+                {t.stock.empty}{" "}
+                <Link href="/products/new" className="link">
+                  {t.stock.addFirst}
+                </Link>
+              </>
+            )}
           </p>
         ) : (
           <table className="table">
@@ -58,6 +67,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 <th className="text-right">{t.stock.sellPrice}</th>
                 <th className="text-right">{t.stock.onHand}</th>
                 <th className="text-right">{t.stock.stockCost}</th>
+                <th className="text-right">{t.stock.actions}</th>
               </tr>
             </thead>
             <tbody>
@@ -75,6 +85,27 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                     {r.isLow && <span className="ml-1 badge badge-warning">{t.stock.low}</span>}
                   </td>
                   <td className="text-right">{fmt.money(r.stockCost)}</td>
+                  <td>
+                    <div className="flex justify-end gap-3 text-sm whitespace-nowrap">
+                      {archived ? (
+                        <ActionForm action={restoreProduct.bind(null, r.id)}>
+                          <button className="link">{t.product.restore}</button>
+                        </ActionForm>
+                      ) : (
+                        <>
+                          <Link href={`/products/${r.id}#details`} className="link">
+                            {t.stock.edit}
+                          </Link>
+                          <ActionForm
+                            action={deleteProduct.bind(null, r.id)}
+                            confirm={r.hasSales ? t.product.deleteConfirmSales(r.onHand) : t.product.deleteConfirmNoSales(r.onHand)}
+                          >
+                            <button className="text-danger hover:underline">{t.common.delete}</button>
+                          </ActionForm>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

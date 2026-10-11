@@ -29,6 +29,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             : Promise.resolve([]),
           db.product.findMany({
             where: {
+              archived: false,
               AND: words.map((w) => ({
                 OR: [
                   { brand: { contains: w, mode: "insensitive" as const } },

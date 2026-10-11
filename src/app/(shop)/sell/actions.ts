@@ -53,13 +53,14 @@ export async function searchSellable(query: string): Promise<Sellable[]> {
           ...(/^\d{4,}$/.test(digits) ? [{ imei: { contains: digits } }] : []),
           { product: { AND: textMatch } },
         ],
+        product: { archived: false },
       },
       include: { product: true },
       orderBy: { addedAt: "asc" },
       take: 30,
     }),
     db.product.findMany({
-      where: { category: "ACCESSORY", quantity: { gt: 0 }, AND: textMatch },
+      where: { category: "ACCESSORY", archived: false, quantity: { gt: 0 }, AND: textMatch },
       take: 15,
     }),
   ]);
@@ -141,7 +142,7 @@ export async function createSale(input: SaleInput): Promise<{ saleId?: string; e
           });
         } else {
           const taken = await tx.product.updateMany({
-            where: { id: item.productId, category: "ACCESSORY", quantity: { gte: item.quantity } },
+            where: { id: item.productId, category: "ACCESSORY", archived: false, quantity: { gte: item.quantity } },
             data: { quantity: { decrement: item.quantity } },
           });
           if (taken.count !== 1) throw new SaleError(t.sell.notEnough);

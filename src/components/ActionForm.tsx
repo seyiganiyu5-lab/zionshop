@@ -18,23 +18,32 @@ export function ActionForm({
   className,
   resetOnSuccess = false,
   confirm,
+  id,
+  onSuccess,
 }: {
   action: (prev: FormResult, formData: FormData) => Promise<FormResult>;
   children: React.ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
   confirm?: string;
+  /** Lets inputs elsewhere on the page join this form via their `form` attribute. */
+  id?: string;
+  onSuccess?: () => void;
 }) {
   const [state, formAction, pending] = useActionState(action, null);
   const ref = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (resetOnSuccess && state?.ok) ref.current?.reset();
-  }, [state, resetOnSuccess]);
+    if (!state?.ok) return;
+    if (resetOnSuccess) ref.current?.reset();
+    onSuccess?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per result
+  }, [state]);
 
   return (
     <form
       ref={ref}
+      id={id}
       className={className}
       onSubmit={(e) => {
         // Submit manually rather than via the form's action prop so React doesn't

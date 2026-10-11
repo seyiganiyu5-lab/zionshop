@@ -30,9 +30,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         title={t.stock.title}
         subtitle={t.stock.summary(totalUnits, fmt.money(totalCost))}
         actions={
-          <Link href="/products/new" className="btn btn-primary">
-            {t.common.newProduct}
-          </Link>
+          <>
+            <a href="/reports/stock" className="btn btn-secondary" download>
+              ⬇ Excel
+            </a>
+            <Link href="/products/new" className="btn btn-primary">
+              {t.common.newProduct}
+            </Link>
+          </>
         }
       />
 

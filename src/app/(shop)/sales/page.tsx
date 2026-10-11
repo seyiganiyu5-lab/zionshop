@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { productName } from "@/lib/format";
 import { getI18n } from "@/lib/i18n/server";
 import { saleProfit } from "@/lib/sales";
-import { startOfShopDay } from "@/lib/time";
+import { shopDateString, startOfShopDay } from "@/lib/time";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t.sales.title };
@@ -38,14 +38,25 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
     db.saleItem.findMany({ where: { sale: where }, select: { quantity: true, unitPrice: true, costPrice: true } }),
   ]);
 
+  // Same period as on screen; "all time" becomes a date range from well before the shop opened.
+  const reportHref =
+    range.key === "all"
+      ? `/reports/sales?period=custom&from=2000-01-01&to=${shopDateString(new Date())}`
+      : `/reports/sales?period=${range.key}`;
+
   return (
     <>
       <PageHeader
         title={t.sales.title}
         actions={
-          <Link href="/sell" className="btn btn-primary">
-            {t.common.newSale}
-          </Link>
+          <>
+            <a href={reportHref} className="btn btn-secondary" download>
+              ⬇ Excel
+            </a>
+            <Link href="/sell" className="btn btn-primary">
+              {t.common.newSale}
+            </Link>
+          </>
         }
       />
 

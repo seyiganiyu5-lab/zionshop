@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import QRCode from "qrcode";
 import { ActionForm } from "@/components/ActionForm";
+import { PasswordInput } from "@/components/PasswordInput";
 import { PageHeader } from "@/components/PageHeader";
 import { SubmitButton } from "@/components/SubmitButton";
 import { db } from "@/lib/db";
@@ -82,7 +83,7 @@ export default async function SettingsPage() {
               <p className="text-sm sm:col-span-3">{s.disableHelp}</p>
               <label>
                 <span className="label">{t.auth.password}</span>
-                <input name="password" type="password" required autoComplete="current-password" className="input" />
+                <PasswordInput name="password" required autoComplete="current-password" />
               </label>
               <label>
                 <span className="label">{t.auth.code}</span>
@@ -135,16 +136,16 @@ export default async function SettingsPage() {
             <input type="text" name="username" autoComplete="username" defaultValue={user.username} hidden readOnly />
             <label className="block">
               <span className="label">{s.currentPassword}</span>
-              <input name="current" type="password" required autoComplete="current-password" className="input" />
+              <PasswordInput name="current" required autoComplete="current-password" />
             </label>
             <label className="block">
               <span className="label">{s.newPassword}</span>
-              <input name="next" type="password" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" className="input" />
+              <PasswordInput name="next" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
               <span className="mt-1 block text-xs text-muted">{s.passwordHelp(MIN_PASSWORD_LENGTH)}</span>
             </label>
             <label className="block">
               <span className="label">{s.confirmPassword}</span>
-              <input name="confirm" type="password" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" className="input" />
+              <PasswordInput name="confirm" required minLength={MIN_PASSWORD_LENGTH} autoComplete="new-password" />
             </label>
             <SubmitButton>{s.changePassword}</SubmitButton>
           </ActionForm>
@@ -168,7 +169,7 @@ export default async function SettingsPage() {
             </label>
             <label className="block">
               <span className="label">{s.currentPassword}</span>
-              <input name="password" type="password" required autoComplete="current-password" className="input" />
+              <PasswordInput name="password" required autoComplete="current-password" />
             </label>
             <SubmitButton>{s.changeUsername}</SubmitButton>
           </ActionForm>

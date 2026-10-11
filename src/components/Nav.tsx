@@ -20,6 +20,7 @@ export function Nav({ theme }: { theme: Theme }) {
     { href: "/sell", label: t.nav.sell },
     { href: "/products", label: t.nav.stock },
     { href: "/sales", label: t.nav.sales },
+    { href: "/reports", label: t.nav.reports },
     { href: "/settings", label: t.nav.settings },
   ];
 
@@ -30,12 +31,12 @@ export function Nav({ theme }: { theme: Theme }) {
           <Logo />
         </Link>
 
-        <nav className="hidden flex-1 gap-1 md:flex">
+        <nav className="hidden flex-1 gap-1 lg:flex">
           {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
                 isActive(l.href) ? "bg-brand-soft text-brand-text" : "text-muted hover:bg-surface-2 hover:text-fg"
               }`}
             >
@@ -45,18 +46,24 @@ export function Nav({ theme }: { theme: Theme }) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <form action="/search" className="hidden lg:block">
+          <form action="/search" className="hidden xl:block">
             <input name="q" placeholder={t.nav.search} aria-label={t.nav.search} className="input w-56" />
           </form>
+          <Link href="/search" className="icon-btn hidden lg:inline-flex xl:hidden" aria-label={t.nav.search} title={t.nav.search}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+          </Link>
           <LanguageSwitch />
           <ThemeToggle initial={theme} />
-          <form action={logout} className="hidden md:block">
-            <button className="text-sm text-muted hover:text-fg">{t.nav.logout}</button>
+          <form action={logout} className="hidden lg:block">
+            <button className="text-sm whitespace-nowrap text-muted hover:text-fg">{t.nav.logout}</button>
           </form>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="icon-btn md:hidden"
+            className="icon-btn lg:hidden"
             aria-expanded={open}
             aria-label={t.nav.menu}
           >
@@ -68,7 +75,7 @@ export function Nav({ theme }: { theme: Theme }) {
       </div>
 
       {open && (
-        <div className="border-t border-line px-4 py-3 md:hidden">
+        <div className="border-t border-line px-4 py-3 lg:hidden">
           <form action="/search" className="mb-3">
             <input name="q" placeholder={t.nav.search} aria-label={t.nav.search} className="input" />
           </form>

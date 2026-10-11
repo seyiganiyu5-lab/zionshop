@@ -47,6 +47,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title={t.search.title} subtitle={q ? t.search.resultsFor(q) : t.search.hint} />
+      <form action="/search" className="mb-6 max-w-xl">
+        <input name="q" defaultValue={q} autoFocus={!q} placeholder={t.nav.search} aria-label={t.nav.search} className="input py-3 text-base" />
+      </form>
 
       {units.length > 0 && (
         <section className="card mb-6 overflow-x-auto p-0">

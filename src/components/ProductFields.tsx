@@ -1,3 +1,5 @@
+import type { Dictionary } from "@/lib/i18n/en";
+
 type ProductValues = {
   brand: string;
   model: string;
@@ -7,31 +9,33 @@ type ProductValues = {
   lowStockThreshold: number;
 };
 
-export function ProductFields({ product }: { product?: ProductValues }) {
+export function ProductFields({ t, product }: { t: Dictionary; product?: ProductValues }) {
+  const p = t.product;
+  const optional = (label: string) => `${label} (${t.common.optional})`;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <label>
-        <span className="label">Brand</span>
-        <input name="brand" required defaultValue={product?.brand} placeholder="Apple, Samsung, Tecno…" className="input" />
+        <span className="label">{p.brand}</span>
+        <input name="brand" required maxLength={60} defaultValue={product?.brand} placeholder={p.brandPlaceholder} className="input" />
       </label>
       <label>
-        <span className="label">Model / name</span>
-        <input name="model" required defaultValue={product?.model} placeholder="iPhone 15, Galaxy A15, 20W charger…" className="input" />
+        <span className="label">{p.model}</span>
+        <input name="model" required maxLength={100} defaultValue={product?.model} placeholder={p.modelPlaceholder} className="input" />
       </label>
       <label>
-        <span className="label">Storage (optional)</span>
-        <input name="storage" defaultValue={product?.storage ?? ""} placeholder="128GB" className="input" />
+        <span className="label">{optional(p.storage)}</span>
+        <input name="storage" maxLength={30} defaultValue={product?.storage ?? ""} placeholder="128GB" className="input" />
       </label>
       <label>
-        <span className="label">Colour (optional)</span>
-        <input name="color" defaultValue={product?.color ?? ""} placeholder="Black" className="input" />
+        <span className="label">{optional(p.color)}</span>
+        <input name="color" maxLength={30} defaultValue={product?.color ?? ""} className="input" />
       </label>
       <label>
-        <span className="label">Selling price</span>
+        <span className="label">{p.sellPrice}</span>
         <input name="sellPrice" type="number" min={0} step={1} required defaultValue={product?.sellPrice} className="input" />
       </label>
       <label>
-        <span className="label">Warn me when stock falls to</span>
+        <span className="label">{p.lowStock}</span>
         <input
           name="lowStockThreshold"
           type="number"

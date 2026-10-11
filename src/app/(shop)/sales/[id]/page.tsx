@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ActionForm } from "@/components/ActionForm";
+import { LogoMark } from "@/components/Logo";
 import { PageHeader } from "@/components/PageHeader";
 import { db } from "@/lib/db";
-import { conditionLabel, formatDateTime, formatMoney, paymentLabel, productName, shopName } from "@/lib/format";
+import { productName, shopName } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
 import { saleProfit } from "@/lib/sales";
 import { voidSale } from "../actions";
 import { PrintButton } from "./PrintButton";
 
-export const dynamic = "force-dynamic";
-
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const sale = await db.sale.findUnique({ where: { id: (await params).id }, select: { number: true } });
-  return { title: sale ? `Sale #${sale.number}` : "Sale" };
+  const [sale, { t }] = await Promise.all([
+    db.sale.findUnique({ where: { id: (await params).id }, select: { number: true } }),
+    getI18n(),
+  ]);
+  return { title: sale ? t.receipt.title(sale.number) : t.sales.title };
 }
 
 export default async function SalePage({
@@ -23,7 +26,8 @@ export default async function SalePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ new?: string }>;
 }) {
-  const [{ id }, { new: isNew }] = await Promise.all([params, searchParams]);
+  const [{ id }, { new: isNew }, { t, fmt }] = await Promise.all([params, searchParams, getI18n()]);
+  const r = t.receipt;
   const sale = await db.sale.findUnique({
     where: { id },
     include: { items: { include: { product: true, unit: true } } },
@@ -33,14 +37,14 @@ export default async function SalePage({
   return (
     <>
       <div className="no-print">
-        {isNew && <p className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">Sale recorded.</p>}
+        {isNew && <p className="mb-4 rounded-lg bg-success-soft p-3 text-sm text-success">{r.recorded}</p>}
         <PageHeader
-          title={`Sale #${sale.number}`}
-          subtitle={`Profit ${formatMoney(saleProfit(sale.items))}`}
+          title={r.title(sale.number)}
+          subtitle={r.profit(fmt.money(saleProfit(sale.items)))}
           actions={
             <>
               <Link href="/sell" className="btn btn-secondary">
-                New sale
+                {r.newSale}
               </Link>
               <PrintButton />
             </>
@@ -49,14 +53,15 @@ export default async function SalePage({
       </div>
 
       <article className="card mx-auto max-w-md print:border-0 print:shadow-none">
-        <header className="mb-4 text-center">
-          <h2 className="text-xl font-bold">{shopName}</h2>
-          <p className="text-sm text-muted">Receipt #{sale.number}</p>
-          <p className="text-sm text-muted">{formatDateTime(sale.createdAt)}</p>
+        <header className="mb-4 flex flex-col items-center text-center">
+          <LogoMark size={40} />
+          <h2 className="mt-2 text-xl font-bold">{shopName}</h2>
+          <p className="text-sm text-muted">{r.receiptNo(sale.number)}</p>
+          <p className="text-sm text-muted">{fmt.dateTime(sale.createdAt)}</p>
         </header>
         {(sale.customerName || sale.customerPhone) && (
           <p className="mb-3 text-sm">
-            Customer: {[sale.customerName, sale.customerPhone].filter(Boolean).join(" · ")}
+            {r.customer} {[sale.customerName, sale.customerPhone].filter(Boolean).join(" · ")}
           </p>
         )}
         <table className="table">
@@ -68,29 +73,26 @@ export default async function SalePage({
                   {productName(i.product)}
                   {i.unit && (
                     <div className="text-xs text-muted">
-                      IMEI <span className="font-mono">{i.unit.imei}</span> · {conditionLabel[i.unit.condition]}
+                      IMEI <span className="font-mono">{i.unit.imei}</span> · {t.condition[i.unit.condition]}
                     </div>
                   )}
                 </td>
-                <td className="px-0 text-right whitespace-nowrap">{formatMoney(i.unitPrice * i.quantity)}</td>
+                <td className="px-0 text-right whitespace-nowrap">{fmt.money(i.unitPrice * i.quantity)}</td>
               </tr>
             ))}
           </tbody>
         </table>
         <div className="mt-3 flex justify-between text-lg font-bold">
-          <span>Total</span>
-          <span>{formatMoney(sale.total)}</span>
+          <span>{r.total}</span>
+          <span>{fmt.money(sale.total)}</span>
         </div>
-        <p className="mt-1 text-sm text-muted">Paid by {paymentLabel[sale.paymentMethod].toLowerCase()}</p>
-        <p className="mt-6 text-center text-sm text-muted">Thank you for shopping with us!</p>
+        <p className="mt-1 text-sm text-muted">{r.paidBy(t.payment[sale.paymentMethod])}</p>
+        <p className="mt-6 text-center text-sm text-muted">{r.thanks}</p>
       </article>
 
       <div className="no-print mx-auto mt-6 max-w-md">
-        <ActionForm
-          action={voidSale.bind(null, sale.id)}
-          confirm="Cancel this sale? The items will go back into stock and the sale will be deleted."
-        >
-          <button className="btn btn-danger">Cancel sale / refund</button>
+        <ActionForm action={voidSale.bind(null, sale.id)} confirm={r.cancelConfirm}>
+          <button className="btn btn-danger">{r.cancel}</button>
         </ActionForm>
       </div>
     </>

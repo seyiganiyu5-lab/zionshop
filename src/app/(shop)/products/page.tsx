@@ -1,20 +1,18 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
-import { formatMoney, productName } from "@/lib/format";
+import { productName } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
 import { getStockRows } from "@/lib/stock";
 
-export const metadata: Metadata = { title: "Stock" };
-export const dynamic = "force-dynamic";
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getI18n()).t.stock.title };
+}
 
-const filters = [
-  { key: "all", label: "All" },
-  { key: "phones", label: "Phones" },
-  { key: "accessories", label: "Accessories" },
-  { key: "low", label: "Low stock" },
-] as const;
+const filterKeys = ["all", "phones", "accessories", "low"] as const;
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ show?: string }> }) {
+  const { t, fmt } = await getI18n();
   const { show = "all" } = await searchParams;
   const category = show === "phones" ? "PHONE" : show === "accessories" ? "ACCESSORY" : undefined;
   let rows = await getStockRows(category ? { category } : {});
@@ -26,23 +24,19 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader
-        title="Stock"
-        subtitle={`${totalUnits} items on hand · ${formatMoney(totalCost)} at cost`}
+        title={t.stock.title}
+        subtitle={t.stock.summary(totalUnits, fmt.money(totalCost))}
         actions={
           <Link href="/products/new" className="btn btn-primary">
-            + New product
+            {t.common.newProduct}
           </Link>
         }
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {filters.map((f) => (
-          <Link
-            key={f.key}
-            href={f.key === "all" ? "/products" : `/products?show=${f.key}`}
-            className={`badge px-3 py-1 text-sm ${show === f.key ? "bg-brand text-white" : "bg-white text-gray-700 ring-1 ring-gray-200"}`}
-          >
-            {f.label}
+        {filterKeys.map((key) => (
+          <Link key={key} href={key === "all" ? "/products" : `/products?show=${key}`} className={show === key ? "pill-active" : "pill"}>
+            {t.stock.filters[key]}
           </Link>
         ))}
       </div>
@@ -50,34 +44,37 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <div className="card overflow-x-auto p-0">
         {rows.length === 0 ? (
           <p className="p-6 text-center text-muted">
-            Nothing here yet. <Link href="/products/new" className="text-brand underline">Add your first product</Link>.
+            {t.stock.empty}{" "}
+            <Link href="/products/new" className="link">
+              {t.stock.addFirst}
+            </Link>
           </p>
         ) : (
           <table className="table">
             <thead>
               <tr>
-                <th>Product</th>
-                <th>Type</th>
-                <th className="text-right">Selling price</th>
-                <th className="text-right">On hand</th>
-                <th className="text-right">Stock cost</th>
+                <th>{t.stock.product}</th>
+                <th>{t.stock.type}</th>
+                <th className="text-right">{t.stock.sellPrice}</th>
+                <th className="text-right">{t.stock.onHand}</th>
+                <th className="text-right">{t.stock.stockCost}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
+                <tr key={r.id} className="row-hover">
                   <td>
-                    <Link href={`/products/${r.id}`} className="font-medium text-brand hover:underline">
+                    <Link href={`/products/${r.id}`} className="link font-medium">
                       {productName(r)}
                     </Link>
                   </td>
-                  <td className="text-muted">{r.category === "PHONE" ? "Phone" : "Accessory"}</td>
-                  <td className="text-right">{formatMoney(r.sellPrice)}</td>
-                  <td className="text-right">
+                  <td className="text-muted">{r.category === "PHONE" ? t.common.phone : t.common.accessory}</td>
+                  <td className="text-right">{fmt.money(r.sellPrice)}</td>
+                  <td className="text-right whitespace-nowrap">
                     <span className={r.isLow ? "font-semibold text-warning" : ""}>{r.onHand}</span>
-                    {r.isLow && <span className="ml-1 badge bg-amber-100 text-amber-800">Low</span>}
+                    {r.isLow && <span className="ml-1 badge badge-warning">{t.stock.low}</span>}
                   </td>
-                  <td className="text-right">{formatMoney(r.stockCost)}</td>
+                  <td className="text-right">{fmt.money(r.stockCost)}</td>
                 </tr>
               ))}
             </tbody>

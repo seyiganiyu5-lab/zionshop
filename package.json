@@ -10,19 +10,23 @@
     "postinstall": "prisma generate",
     "vercel-build": "prisma migrate deploy && next build",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "reset-owner": "node scripts/reset-owner.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
-    "jose": "6.2.12",
     "next": "15.5.27",
+    "otpauth": "9.5.2",
+    "qrcode": "1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "0.0.1",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
     "@types/node": "22.15.30",
+    "@types/qrcode": "1.5.6",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "prisma": "6.19.3",

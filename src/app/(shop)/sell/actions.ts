@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { requireUser } from "@/lib/auth/session";
+import { getI18n } from "@/lib/i18n/server";
 import { cleanImei } from "@/lib/imei";
 import { productName } from "@/lib/format";
 
@@ -28,7 +30,8 @@ export type Sellable = SellableUnit | SellableAccessory;
 
 /** Find in-stock phones (by IMEI or model) and accessories matching the search. */
 export async function searchSellable(query: string): Promise<Sellable[]> {
-  const q = query.trim();
+  await requireUser();
+  const q = String(query).trim().slice(0, 100);
   if (q.length < 2) return [];
   const digits = cleanImei(q);
   const words = q.split(/\s+/).filter(Boolean);
@@ -85,7 +88,7 @@ export async function searchSellable(query: string): Promise<Sellable[]> {
   ];
 }
 
-const price = z.number().int().min(0);
+const price = z.number().int().min(0).max(1_000_000_000);
 const saleSchema = z.object({
   paymentMethod: z.enum(["CASH", "TRANSFER", "CARD"]),
   customerName: z.string().trim().max(100).optional(),
@@ -94,10 +97,11 @@ const saleSchema = z.object({
     .array(
       z.discriminatedUnion("kind", [
         z.object({ kind: z.literal("unit"), unitId: z.string(), price }),
-        z.object({ kind: z.literal("accessory"), productId: z.string(), quantity: z.number().int().min(1), price }),
+        z.object({ kind: z.literal("accessory"), productId: z.string(), quantity: z.number().int().min(1).max(10_000), price }),
       ]),
     )
-    .min(1, "Add at least one item."),
+    .min(1)
+    .max(100),
 });
 
 export type SaleInput = z.input<typeof saleSchema>;
@@ -105,12 +109,16 @@ export type SaleInput = z.input<typeof saleSchema>;
 class SaleError extends Error {}
 
 export async function createSale(input: SaleInput): Promise<{ saleId?: string; error?: string }> {
+  await requireUser();
+  const { t } = await getI18n();
   const parsed = saleSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Invalid sale." };
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.path[0] === "items" && !input?.items?.length ? t.sell.addItem : t.sell.invalid };
+  }
   const { items, paymentMethod, customerName, customerPhone } = parsed.data;
 
   const unitIds = items.flatMap((i) => (i.kind === "unit" ? [i.unitId] : []));
-  if (new Set(unitIds).size !== unitIds.length) return { error: "The same phone is in the cart twice." };
+  if (new Set(unitIds).size !== unitIds.length) return { error: t.sell.duplicate };
 
   try {
     const sale = await db.$transaction(async (tx) => {
@@ -122,7 +130,7 @@ export async function createSale(input: SaleInput): Promise<{ saleId?: string; e
             where: { id: item.unitId, status: "IN_STOCK" },
             data: { status: "SOLD" },
           });
-          if (claimed.count !== 1) throw new SaleError("A phone in the cart has already been sold or removed.");
+          if (claimed.count !== 1) throw new SaleError(t.sell.alreadySold);
           const unit = await tx.unit.findUniqueOrThrow({ where: { id: item.unitId } });
           lines.push({
             productId: unit.productId,
@@ -136,7 +144,7 @@ export async function createSale(input: SaleInput): Promise<{ saleId?: string; e
             where: { id: item.productId, category: "ACCESSORY", quantity: { gte: item.quantity } },
             data: { quantity: { decrement: item.quantity } },
           });
-          if (taken.count !== 1) throw new SaleError("There isn't enough stock for one of the accessories.");
+          if (taken.count !== 1) throw new SaleError(t.sell.notEnough);
           const product = await tx.product.findUniqueOrThrow({ where: { id: item.productId } });
           lines.push({
             productId: product.id,

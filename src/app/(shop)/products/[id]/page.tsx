@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductFields } from "@/components/ProductFields";
 import { SubmitButton } from "@/components/SubmitButton";
 import { db } from "@/lib/db";
-import { conditionLabel, formatDateTime, formatMoney, productName } from "@/lib/format";
+import { productName } from "@/lib/format";
+import { getI18n } from "@/lib/i18n/server";
 import {
   addUnits,
   deleteProduct,
@@ -15,8 +16,6 @@ import {
   setAccessoryQuantity,
   updateProduct,
 } from "../actions";
-
-export const dynamic = "force-dynamic";
 
 async function getProduct(id: string) {
   return db.product.findUnique({
@@ -32,13 +31,15 @@ async function getProduct(id: string) {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const product = await getProduct((await params).id);
-  return { title: product ? productName(product) : "Product" };
+  return { title: product ? productName(product) : "Zionshop" };
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const product = await getProduct(id);
+  const [product, { t, fmt }] = await Promise.all([getProduct(id), getI18n()]);
   if (!product) notFound();
+  const p = t.product;
+  const optional = (label: string) => `${label} (${t.common.optional})`;
 
   const isPhone = product.category === "PHONE";
   const inStock = product.units.filter((u) => u.status === "IN_STOCK");
@@ -48,14 +49,10 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={productName(product)}
-        subtitle={
-          <>
-            {isPhone ? "Phone" : "Accessory"} · {onHand} on hand · sells for {formatMoney(product.sellPrice)}
-          </>
-        }
+        subtitle={p.subtitle(isPhone ? t.common.phone : t.common.accessory, onHand, fmt.money(product.sellPrice))}
         actions={
           <Link href="/products" className="btn btn-secondary">
-            ← Back to stock
+            {p.backToStock}
           </Link>
         }
       />
@@ -64,18 +61,18 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
         <div className="space-y-6">
           {isPhone ? (
             <section className="card">
-              <h2 className="mb-3 font-semibold">Phones ({inStock.length} in stock)</h2>
+              <h2 className="mb-3 font-semibold">{p.phones(inStock.length)}</h2>
               {product.units.length === 0 ? (
-                <p className="text-sm text-muted">No phones added yet. Use the form to add them by IMEI.</p>
+                <p className="text-sm text-muted">{p.noPhones}</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="table">
                     <thead>
                       <tr>
-                        <th>IMEI</th>
-                        <th>Condition</th>
-                        <th className="text-right">Cost</th>
-                        <th>Status</th>
+                        <th>{p.imei}</th>
+                        <th>{p.condition}</th>
+                        <th className="text-right">{p.cost}</th>
+                        <th>{p.status}</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -86,26 +83,26 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
                             {u.imei}
                             {(u.supplier || u.notes) && (
                               <div className="font-sans text-xs text-muted">
-                                {[u.supplier && `From ${u.supplier}`, u.notes].filter(Boolean).join(" · ")}
+                                {[u.supplier && p.from(u.supplier), u.notes].filter(Boolean).join(" · ")}
                               </div>
                             )}
                           </td>
-                          <td>{conditionLabel[u.condition]}</td>
-                          <td className="text-right">{formatMoney(u.costPrice)}</td>
+                          <td>{t.condition[u.condition]}</td>
+                          <td className="text-right">{fmt.money(u.costPrice)}</td>
                           <td>
                             {u.saleItem ? (
-                              <Link href={`/sales/${u.saleItem.sale.id}`} className="text-sm text-brand hover:underline">
-                                Sold #{u.saleItem.sale.number} for {formatMoney(u.saleItem.unitPrice)}
-                                <div className="text-xs text-muted">{formatDateTime(u.saleItem.sale.createdAt)}</div>
+                              <Link href={`/sales/${u.saleItem.sale.id}`} className="link text-sm">
+                                {p.soldFor(u.saleItem.sale.number, fmt.money(u.saleItem.unitPrice))}
+                                <div className="text-xs text-muted">{fmt.dateTime(u.saleItem.sale.createdAt)}</div>
                               </Link>
                             ) : (
-                              <span className="badge bg-green-100 text-green-800">In stock</span>
+                              <span className="badge badge-success">{t.common.inStock}</span>
                             )}
                           </td>
                           <td className="text-right">
                             {u.status === "IN_STOCK" && (
-                              <ActionForm action={deleteUnit.bind(null, u.id)} confirm={`Remove IMEI ${u.imei}?`}>
-                                <button className="text-xs text-danger hover:underline">Remove</button>
+                              <ActionForm action={deleteUnit.bind(null, u.id)} confirm={p.removeConfirm(u.imei)}>
+                                <button className="text-xs text-danger hover:underline">{t.common.remove}</button>
                               </ActionForm>
                             )}
                           </td>
@@ -118,85 +115,77 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             </section>
           ) : (
             <section className="card">
-              <h2 className="mb-1 font-semibold">Stock</h2>
-              <p className="mb-4 text-sm text-muted">
-                {product.quantity} on hand · average cost {formatMoney(product.costPrice)} each
-              </p>
-              <ActionForm action={setAccessoryQuantity.bind(null, product.id)} className="flex items-end gap-2">
-                <label className="flex-1">
-                  <span className="label">Correct the count (after a stock take, damage or loss)</span>
+              <h2 className="mb-1 font-semibold">{p.stockHeading}</h2>
+              <p className="mb-4 text-sm text-muted">{p.accessorySummary(product.quantity, fmt.money(product.costPrice))}</p>
+              <ActionForm action={setAccessoryQuantity.bind(null, product.id)} className="flex flex-wrap items-end gap-2">
+                <label className="min-w-48 flex-1">
+                  <span className="label">{p.correctCount}</span>
                   <input name="quantity" type="number" min={0} step={1} defaultValue={product.quantity} className="input" />
                 </label>
-                <SubmitButton className="btn btn-secondary">Update count</SubmitButton>
+                <SubmitButton className="btn btn-secondary">{p.updateCount}</SubmitButton>
               </ActionForm>
             </section>
           )}
 
           <section className="card">
-            <h2 className="mb-3 font-semibold">Details</h2>
+            <h2 className="mb-3 font-semibold">{p.details}</h2>
             <ActionForm action={updateProduct.bind(null, product.id)} className="space-y-4">
-              <ProductFields product={product} />
-              <SubmitButton>Save changes</SubmitButton>
+              <ProductFields t={t} product={product} />
+              <SubmitButton>{t.common.save}</SubmitButton>
             </ActionForm>
           </section>
 
-          <ActionForm action={deleteProduct.bind(null, product.id)} confirm="Delete this product?">
-            <button className="btn btn-danger">Delete product</button>
+          <ActionForm action={deleteProduct.bind(null, product.id)} confirm={p.deleteConfirm}>
+            <button className="btn btn-danger">{p.deleteProduct}</button>
           </ActionForm>
         </div>
 
         <aside>
           {isPhone ? (
             <ActionForm action={addUnits.bind(null, product.id)} resetOnSuccess className="card space-y-4 lg:sticky lg:top-4">
-              <h2 className="font-semibold">Add phones</h2>
+              <h2 className="font-semibold">{p.addPhones}</h2>
               <label className="block">
-                <span className="label">IMEI numbers (one per line)</span>
-                <textarea
-                  name="imeis"
-                  rows={4}
-                  required
-                  placeholder={"Scan or type, one per line.\nDial *#06# on the phone to see it."}
-                  className="input font-mono"
-                />
+                <span className="label">{p.imeiList}</span>
+                <textarea name="imeis" rows={4} required placeholder={p.imeiPlaceholder} className="input font-mono" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label>
-                  <span className="label">Condition</span>
+                  <span className="label">{p.condition}</span>
                   <select name="condition" className="input" defaultValue="NEW">
-                    <option value="NEW">New</option>
-                    <option value="USED">Used</option>
-                    <option value="REFURBISHED">Refurbished</option>
+                    <option value="NEW">{t.condition.NEW}</option>
+                    <option value="USED">{t.condition.USED}</option>
+                    <option value="REFURBISHED">{t.condition.REFURBISHED}</option>
                   </select>
                 </label>
                 <label>
-                  <span className="label">Cost each</span>
+                  <span className="label">{p.costEach}</span>
                   <input name="costPrice" type="number" min={0} step={1} required className="input" />
                 </label>
               </div>
               <label className="block">
-                <span className="label">Supplier (optional)</span>
-                <input name="supplier" className="input" />
+                <span className="label">{optional(p.supplier)}</span>
+                <input name="supplier" maxLength={100} className="input" />
               </label>
               <label className="block">
-                <span className="label">Notes (optional)</span>
-                <input name="notes" placeholder="e.g. small scratch on back" className="input" />
+                <span className="label">{optional(p.notes)}</span>
+                <input name="notes" maxLength={300} placeholder={p.notesPlaceholder} className="input" />
               </label>
-              <SubmitButton>Add to stock</SubmitButton>
+              <SubmitButton>{p.addToStock}</SubmitButton>
             </ActionForm>
           ) : (
             <ActionForm action={receiveAccessories.bind(null, product.id)} resetOnSuccess className="card space-y-4 lg:sticky lg:top-4">
-              <h2 className="font-semibold">Receive stock</h2>
+              <h2 className="font-semibold">{p.receiveStock}</h2>
               <div className="grid grid-cols-2 gap-3">
                 <label>
-                  <span className="label">Quantity</span>
+                  <span className="label">{p.quantity}</span>
                   <input name="quantity" type="number" min={1} step={1} required className="input" />
                 </label>
                 <label>
-                  <span className="label">Cost each</span>
+                  <span className="label">{p.costEach}</span>
                   <input name="costPrice" type="number" min={0} step={1} required className="input" />
                 </label>
               </div>
-              <SubmitButton>Add to stock</SubmitButton>
+              <SubmitButton>{p.addToStock}</SubmitButton>
             </ActionForm>
           )}
         </aside>

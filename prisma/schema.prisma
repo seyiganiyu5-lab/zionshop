@@ -95,3 +95,44 @@ model SaleItem {
   unitPrice Int
   costPrice Int
 }
+
+model User {
+  id                String    @id @default(cuid())
+  /// Stored lowercased.
+  username          String    @unique
+  passwordHash      String
+  /// Authenticator-app secret, encrypted with AUTH_SECRET. Null until 2FA is set up.
+  totpSecret        String?
+  totpEnabled       Boolean   @default(false)
+  /// Last accepted 30-second step, so a code can't be reused.
+  totpLastStep      Int?
+  createdAt         DateTime  @default(now())
+  passwordChangedAt DateTime  @default(now())
+  sessions          Session[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  /// SHA-256 of the cookie value; the raw token is never stored.
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  ip         String?
+  userAgent  String?
+
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  username  String
+  ip        String
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  @@index([username, createdAt])
+  @@index([ip, createdAt])
+}

@@ -1,51 +1,160 @@
 @import "tailwindcss";
 
-@theme {
-  --color-brand: #4f46e5;
-  --color-brand-dark: #4338ca;
-  --color-muted: #6b7280;
-  --color-danger: #dc2626;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
+/*
+ * Colours are CSS variables so light/dark mode is a single switch.
+ * "Automatic" follows the device; the .light / .dark class on <html>
+ * (from the theme cookie) overrides it.
+ */
+:root {
+  color-scheme: light;
+  --page: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f1f3f8;
+  --line: #e4e7ef;
+  --line-strong: #cfd4df;
+  --fg: #111827;
+  --fg-2: #374151;
+  --muted: #6b7280;
+  --brand: #4f46e5;
+  --brand-hover: #4338ca;
+  --brand-text: #4f46e5;
+  --brand-soft: rgb(79 70 229 / 0.1);
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --page: #0b0d14;
+  --surface: #141824;
+  --surface-2: #1c2130;
+  --line: #262c3d;
+  --line-strong: #363e55;
+  --fg: #e8eaf1;
+  --fg-2: #c5c9d6;
+  --muted: #8d94a8;
+  --brand: #6366f1;
+  --brand-hover: #818cf8;
+  --brand-text: #a5b4fc;
+  --brand-soft: rgb(99 102 241 / 0.18);
+  --danger: #f87171;
+  --danger-soft: rgb(248 113 113 / 0.12);
+  --success: #4ade80;
+  --success-soft: rgb(74 222 128 / 0.14);
+  --warning: #fbbf24;
+  --warning-soft: rgb(251 191 36 / 0.14);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+    --page: #0b0d14;
+    --surface: #141824;
+    --surface-2: #1c2130;
+    --line: #262c3d;
+    --line-strong: #363e55;
+    --fg: #e8eaf1;
+    --fg-2: #c5c9d6;
+    --muted: #8d94a8;
+    --brand: #6366f1;
+    --brand-hover: #818cf8;
+    --brand-text: #a5b4fc;
+    --brand-soft: rgb(99 102 241 / 0.18);
+    --danger: #f87171;
+    --danger-soft: rgb(248 113 113 / 0.12);
+    --success: #4ade80;
+    --success-soft: rgb(74 222 128 / 0.14);
+    --warning: #fbbf24;
+    --warning-soft: rgb(251 191 36 / 0.14);
+  }
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-muted: var(--muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-text: var(--brand-text);
+  --color-brand-soft: var(--brand-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  @apply bg-page text-fg antialiased;
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-gray-200 bg-white p-5 shadow-sm;
+    @apply rounded-xl border border-line bg-surface p-5 shadow-sm;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-gray-700;
+    @apply mb-1 block text-sm font-medium text-fg-2;
   }
   .input {
-    @apply block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none;
+    @apply block w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm text-fg placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/25 focus:outline-none;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-1 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply bg-brand text-white hover:bg-brand-dark;
+    @apply bg-brand text-white hover:bg-brand-hover;
   }
   .btn-secondary {
-    @apply border border-gray-300 bg-white text-gray-800 hover:bg-gray-50;
+    @apply border border-line-strong bg-surface text-fg hover:bg-surface-2;
   }
   .btn-danger {
-    @apply border border-red-200 bg-white text-danger hover:bg-red-50;
+    @apply border border-danger/30 bg-surface text-danger hover:bg-danger-soft;
+  }
+  .icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line text-muted hover:bg-surface-2 hover:text-fg;
+  }
+  .link {
+    @apply text-brand-text hover:underline;
   }
   .table {
     @apply w-full text-left text-sm;
   }
   .table th {
-    @apply border-b border-gray-200 px-3 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase;
+    @apply border-b border-line px-3 py-2 text-xs font-semibold tracking-wide text-muted uppercase;
   }
   .table td {
-    @apply border-b border-gray-100 px-3 py-2 align-top;
+    @apply border-b border-line px-3 py-2 align-top;
+  }
+  .row-hover {
+    @apply hover:bg-surface-2;
   }
   .badge {
     @apply inline-block rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+  .badge-success {
+    @apply bg-success-soft text-success;
+  }
+  .badge-warning {
+    @apply bg-warning-soft text-warning;
+  }
+  .badge-danger {
+    @apply bg-danger-soft text-danger;
+  }
+  .pill {
+    @apply rounded-full bg-surface px-3 py-1 text-sm text-fg-2 ring-1 ring-line;
+  }
+  .pill-active {
+    @apply rounded-full bg-brand px-3 py-1 text-sm text-white;
   }
 }
 
@@ -53,7 +162,15 @@ body {
   .no-print {
     display: none !important;
   }
-  body {
-    background: white;
+  :root,
+  :root.dark,
+  :root:not(.light) {
+    color-scheme: light;
+    --page: #fff;
+    --surface: #fff;
+    --fg: #000;
+    --fg-2: #000;
+    --muted: #444;
+    --line: #ddd;
   }
 }

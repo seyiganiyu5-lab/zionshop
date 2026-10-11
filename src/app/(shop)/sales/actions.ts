@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { requireUser } from "@/lib/auth/session";
 import type { FormResult } from "@/components/ActionForm";
 
 /** Undo a sale entered by mistake (or a full refund): items go back into stock. */
 export async function voidSale(saleId: string, _prev: FormResult): Promise<FormResult> {
+  await requireUser();
   await db.$transaction(async (tx) => {
     const sale = await tx.sale.findUnique({ where: { id: saleId }, include: { items: true } });
     if (!sale) return;

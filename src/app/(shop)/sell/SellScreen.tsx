@@ -1,21 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "@/components/I18nProvider";
 import { createSale, searchSellable, type Sellable } from "./actions";
 
 type CartLine =
   | { kind: "unit"; key: string; unitId: string; name: string; imei: string; price: number }
   | { kind: "accessory"; key: string; productId: string; name: string; price: number; quantity: number; available: number };
 
-const conditionLabel = { NEW: "New", USED: "Used", REFURBISHED: "Refurbished" } as const;
-
-export function SellScreen({ currency }: { currency: string }) {
+export function SellScreen() {
   const router = useRouter();
-  const money = useMemo(
-    () => new Intl.NumberFormat("en-NG", { style: "currency", currency, maximumFractionDigits: 0 }),
-    [currency],
-  );
+  const { t, fmt } = useI18n();
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Sellable[]>([]);
@@ -111,33 +107,34 @@ export function SellScreen({ currency }: { currency: string }) {
               if (visible.length === 1) add(visible[0]);
             }
           }}
-          placeholder="IMEI, brand or model…"
+          placeholder={t.sell.searchPlaceholder}
+          aria-label={t.sell.searchPlaceholder}
           className="input py-3 text-base"
         />
         {query.trim().length >= 2 && (
-          <div className="card divide-y divide-gray-100 p-0">
+          <div className="card divide-y divide-line p-0">
             {visible.length === 0 ? (
-              <p className="p-4 text-sm text-muted">{searching ? "Searching…" : "No matching items in stock."}</p>
+              <p className="p-4 text-sm text-muted">{searching ? t.sell.searching : t.sell.noMatch}</p>
             ) : (
               visible.map((r) => (
                 <button
                   key={r.kind === "unit" ? r.unitId : r.productId}
                   onClick={() => add(r)}
-                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-2"
                 >
                   <span>
                     <span className="font-medium">{r.name}</span>
                     <span className="block text-xs text-muted">
                       {r.kind === "unit" ? (
                         <>
-                          <span className="font-mono">{r.imei}</span> · {conditionLabel[r.condition]}
+                          <span className="font-mono">{r.imei}</span> · {t.condition[r.condition]}
                         </>
                       ) : (
-                        `Accessory · ${r.available} in stock`
+                        t.sell.accessoryAvailable(r.available)
                       )}
                     </span>
                   </span>
-                  <span className="text-sm font-medium">{money.format(r.price)}</span>
+                  <span className="text-sm font-medium">{fmt.money(r.price)}</span>
                 </button>
               ))
             )}
@@ -146,9 +143,9 @@ export function SellScreen({ currency }: { currency: string }) {
 
         <div className="card p-0">
           {cart.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">The cart is empty.</p>
+            <p className="p-6 text-center text-sm text-muted">{t.sell.emptyCart}</p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-line">
               {cart.map((l) => (
                 <li key={l.key} className="flex flex-wrap items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -157,7 +154,7 @@ export function SellScreen({ currency }: { currency: string }) {
                   </div>
                   {l.kind === "accessory" && (
                     <label className="text-xs text-muted">
-                      Qty
+                      {t.sell.qty}
                       <input
                         type="number"
                         min={1}
@@ -171,7 +168,7 @@ export function SellScreen({ currency }: { currency: string }) {
                     </label>
                   )}
                   <label className="text-xs text-muted">
-                    Price
+                    {t.sell.price}
                     <input
                       type="number"
                       min={0}
@@ -183,9 +180,9 @@ export function SellScreen({ currency }: { currency: string }) {
                   <button
                     onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))}
                     className="text-sm text-danger hover:underline"
-                    aria-label={`Remove ${l.name}`}
+                    aria-label={`${t.common.remove}: ${l.name}`}
                   >
-                    Remove
+                    {t.common.remove}
                   </button>
                 </li>
               ))}
@@ -196,41 +193,39 @@ export function SellScreen({ currency }: { currency: string }) {
 
       <aside className="card h-fit space-y-4 lg:sticky lg:top-4">
         <div className="flex items-baseline justify-between">
-          <span className="text-sm text-muted">Total</span>
-          <span className="text-3xl font-bold">{money.format(total)}</span>
+          <span className="text-sm text-muted">{t.sell.total}</span>
+          <span className="text-3xl font-bold">{fmt.money(total)}</span>
         </div>
         <fieldset>
-          <span className="label">Payment</span>
+          <span className="label">{t.sell.payment}</span>
           <div className="grid grid-cols-3 gap-2">
-            {(
-              [
-                ["CASH", "Cash"],
-                ["TRANSFER", "Transfer"],
-                ["CARD", "Card / POS"],
-              ] as const
-            ).map(([value, label]) => (
+            {(["CASH", "TRANSFER", "CARD"] as const).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setPaymentMethod(value)}
                 className={`btn ${paymentMethod === value ? "btn-primary" : "btn-secondary"} px-2`}
               >
-                {label}
+                {t.paymentShort[value]}
               </button>
             ))}
           </div>
         </fieldset>
         <label className="block">
-          <span className="label">Customer name (optional)</span>
-          <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="input" />
+          <span className="label">
+            {t.sell.customerName} ({t.common.optional})
+          </span>
+          <input maxLength={100} value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="input" />
         </label>
         <label className="block">
-          <span className="label">Customer phone (optional)</span>
-          <input value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="input" />
+          <span className="label">
+            {t.sell.customerPhone} ({t.common.optional})
+          </span>
+          <input maxLength={30} inputMode="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="input" />
         </label>
         {error && <p className="text-sm text-danger">{error}</p>}
         <button onClick={checkout} disabled={cart.length === 0 || saving} className="btn btn-primary w-full py-3 text-base">
-          {saving ? "Saving…" : "Complete sale"}
+          {saving ? t.common.saving : t.sell.complete}
         </button>
       </aside>
     </div>

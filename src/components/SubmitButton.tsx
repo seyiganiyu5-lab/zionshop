@@ -1,6 +1,7 @@
 "use client";
 
 import { useFormPending } from "./ActionForm";
+import { useI18n } from "./I18nProvider";
 
 export function SubmitButton({
   children,
@@ -10,9 +11,10 @@ export function SubmitButton({
   className?: string;
 }) {
   const pending = useFormPending();
+  const { t } = useI18n();
   return (
     <button className={className} disabled={pending}>
-      {pending ? "Saving…" : children}
+      {pending ? t.common.saving : children}
     </button>
   );
 }

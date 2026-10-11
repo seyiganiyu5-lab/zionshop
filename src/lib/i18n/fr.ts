@@ -33,6 +33,8 @@ export const fr: Dictionary = {
     phone: "Téléphone",
     accessory: "Accessoire",
     inStock: "En stock",
+    showPassword: "Afficher le mot de passe",
+    hidePassword: "Masquer le mot de passe",
     invalidInput: "Certaines informations sont manquantes ou invalides.",
   },
 

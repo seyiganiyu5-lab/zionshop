@@ -31,6 +31,8 @@ export const en = {
     phone: "Phone",
     accessory: "Accessory",
     inStock: "In stock",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
     invalidInput: "Some details are missing or invalid.",
   },
 

@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState } from "react";
 import { useI18n } from "@/components/I18nProvider";
+import { PasswordInput } from "@/components/PasswordInput";
 import { login } from "./actions";
 
 export function LoginForm() {
@@ -33,7 +34,7 @@ export function LoginForm() {
       </label>
       <label className="block">
         <span className="label">{t.auth.password}</span>
-        <input name="password" type="password" required autoComplete="current-password" maxLength={1000} className="input" />
+        <PasswordInput name="password" required autoComplete="current-password" maxLength={1000} />
       </label>
       {state?.needCode && (
         <label className="block">

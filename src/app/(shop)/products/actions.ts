@@ -70,16 +70,38 @@ export async function updateProduct(id: string, _prev: FormResult, formData: For
   return { ok: t.stockMsg.saved };
 }
 
+/**
+ * Never-sold products are deleted outright. Products with sales are archived
+ * instead (hidden, stock cleared) so past sales keep their product.
+ */
 export async function deleteProduct(id: string, _prev: FormResult): Promise<FormResult> {
+  await begin();
+  const hasSales = (await db.saleItem.count({ where: { productId: id } })) > 0;
+  await db.$transaction(async (tx) => {
+    await tx.unit.deleteMany({ where: { productId: id, status: "IN_STOCK" } });
+    if (hasSales) {
+      await tx.product.update({ where: { id }, data: { archived: true, quantity: 0 } });
+    } else {
+      await tx.product.delete({ where: { id } });
+    }
+  });
+  revalidateStock(id);
+  redirect(hasSales ? "/products?show=archived" : "/products");
+}
+
+export async function restoreProduct(id: string, _prev: FormResult): Promise<FormResult> {
   const t = await begin();
-  const [units, sales] = await Promise.all([
-    db.unit.count({ where: { productId: id } }),
-    db.saleItem.count({ where: { productId: id } }),
-  ]);
-  if (units > 0 || sales > 0) return { error: t.stockMsg.cantDelete };
-  await db.product.delete({ where: { id } });
-  revalidateStock();
-  redirect("/products");
+  await db.product.update({ where: { id }, data: { archived: false } });
+  revalidateStock(id);
+  return { ok: t.stockMsg.restored };
+}
+
+/** Stock can't be added to a deleted (archived) product. */
+async function assertActive(productId: string, t: Dictionary) {
+  const product = await db.product.findUnique({ where: { id: productId }, select: { archived: true, category: true } });
+  if (!product) return { error: t.common.invalidInput };
+  if (product.archived) return { error: t.stockMsg.archived };
+  return { product };
 }
 
 const unitsSchema = z.object({
@@ -97,8 +119,9 @@ export async function addUnits(productId: string, _prev: FormResult, formData: F
   if (!parsed.success) return { error: t.common.invalidInput };
   const { imeis: raw, ...rest } = parsed.data;
 
-  const product = await db.product.findUnique({ where: { id: productId }, select: { category: true } });
-  if (product?.category !== "PHONE") return { error: t.common.invalidInput };
+  const active = await assertActive(productId, t);
+  if (!active.product) return { error: active.error };
+  if (active.product.category !== "PHONE") return { error: t.common.invalidInput };
 
   const imeis = [...new Set(raw.split(/[\n,]+/).map(cleanImei).filter(Boolean))];
   if (imeis.length === 0) return { error: t.stockMsg.enterImei };
@@ -119,14 +142,43 @@ export async function addUnits(productId: string, _prev: FormResult, formData: F
   return { ok: t.stockMsg.addedPhones(imeis.length) };
 }
 
-export async function deleteUnit(unitId: string, _prev: FormResult): Promise<FormResult> {
+const unitEditSchema = z.object({
+  imei: z.string().transform(cleanImei),
+  condition: z.enum(["NEW", "USED", "REFURBISHED"]),
+  costPrice: money,
+  supplier: optionalText(100),
+  notes: optionalText(300),
+});
+
+/** Fix a phone's details. Only phones still in stock, so sales records stay accurate. */
+export async function updateUnit(unitId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
   const t = await begin();
+  const parsed = unitEditSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: t.common.invalidInput };
+  if (!isValidImei(parsed.data.imei)) return { error: t.stockMsg.imeiInvalid };
+
   const unit = await db.unit.findUnique({ where: { id: unitId } });
   if (!unit) return { error: t.stockMsg.phoneNotFound };
-  if (unit.status !== "IN_STOCK") return { error: t.stockMsg.soldCantDelete };
-  await db.unit.delete({ where: { id: unitId } });
+  if (unit.status !== "IN_STOCK") return { error: t.product.soldLocked };
+
+  try {
+    await db.unit.update({ where: { id: unitId, status: "IN_STOCK" }, data: parsed.data });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return { error: t.stockMsg.imeiTaken };
+    throw e;
+  }
   revalidateStock(unit.productId);
-  return { ok: t.stockMsg.removed };
+  return { ok: t.stockMsg.unitSaved };
+}
+
+export async function removeUnits(productId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
+  const t = await begin();
+  const ids = formData.getAll("unitId").map(String).slice(0, 1000);
+  if (ids.length === 0) return { error: t.stockMsg.nothingSelected };
+  // Sold phones are skipped by the status filter; their sales stay intact.
+  const { count } = await db.unit.deleteMany({ where: { id: { in: ids }, productId, status: "IN_STOCK" } });
+  revalidateStock(productId);
+  return { ok: t.stockMsg.removedMany(count) };
 }
 
 const receiveSchema = z.object({
@@ -140,6 +192,8 @@ export async function receiveAccessories(productId: string, _prev: FormResult, f
   const parsed = receiveSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: t.common.invalidInput };
   const { quantity, costPrice } = parsed.data;
+  const active = await assertActive(productId, t);
+  if (!active.product) return { error: active.error };
 
   await db.$transaction(async (tx) => {
     const p = await tx.product.findUniqueOrThrow({ where: { id: productId, category: "ACCESSORY" } });
@@ -156,6 +210,8 @@ export async function setAccessoryQuantity(productId: string, _prev: FormResult,
   const t = await begin();
   const quantity = z.coerce.number().int().min(0).max(1_000_000).safeParse(formData.get("quantity"));
   if (!quantity.success) return { error: t.stockMsg.countInvalid };
+  const active = await assertActive(productId, t);
+  if (!active.product) return { error: active.error };
   await db.product.update({ where: { id: productId, category: "ACCESSORY" }, data: { quantity: quantity.data } });
   revalidateStock(productId);
   return { ok: t.stockMsg.countUpdated };

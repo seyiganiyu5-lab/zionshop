@@ -46,8 +46,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
   const optional = (label: string) => `${label} (${t.common.optional})`;
 
   const isPhone = product.category === "PHONE";
+  const tracksImei = product.trackImei;
   const inStock = product.units.filter((u) => u.status === "IN_STOCK");
-  const onHand = isPhone ? inStock.length : product.quantity;
+  const onHand = tracksImei ? inStock.length : product.quantity;
   const hasSales = product._count.saleItems > 0;
   const deleteAction = (
     <ActionForm
@@ -78,7 +79,9 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={productName(product)}
-        subtitle={p.subtitle(isPhone ? t.common.phone : t.common.accessory, onHand, fmt.money(product.sellPrice))}
+        subtitle={`${p.subtitle(isPhone ? t.common.phone : t.common.accessory, onHand, fmt.money(product.sellPrice))} · ${
+          tracksImei ? p.byImei : p.byQuantity
+        }`}
         actions={
           <>
             <Link href="/products" className="btn btn-secondary">
@@ -104,8 +107,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
-          {isPhone ? (
+        <div className="order-2 space-y-6 lg:order-1">
+          {tracksImei ? (
             <section className="card">
               <h2 className="mb-3 font-semibold">{p.phones(inStock.length)}</h2>
               {product.units.length === 0 ? (
@@ -134,6 +137,16 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
             <h2 className="mb-3 font-semibold">{p.details}</h2>
             <ActionForm action={updateProduct.bind(null, product.id)} className="space-y-4">
               <ProductFields t={t} product={product} />
+              {isPhone && (
+                <label className="flex items-start gap-2 rounded-lg border border-line p-3 text-sm">
+                  <input type="hidden" name="trackImeiShown" value="1" />
+                  <input type="checkbox" name="trackImei" defaultChecked={tracksImei} className="mt-0.5 accent-brand" />
+                  <span>
+                    <span className="font-medium">{p.trackImei}</span>
+                    <span className="block text-xs text-muted">{p.trackImeiHelp}</span>
+                  </span>
+                </label>
+              )}
               <SubmitButton>{t.common.save}</SubmitButton>
             </ActionForm>
           </section>
@@ -147,8 +160,8 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           )}
         </div>
 
-        <aside>
-          {product.archived ? null : isPhone ? (
+        <aside className="order-1 lg:order-2">
+          {product.archived ? null : tracksImei ? (
             <ActionForm action={addUnits.bind(null, product.id)} resetOnSuccess className="card space-y-4 lg:sticky lg:top-4">
               <h2 className="font-semibold">{p.addPhones}</h2>
               <label className="block">

@@ -130,7 +130,7 @@ export function SellScreen() {
                           <span className="font-mono">{r.imei}</span> · {t.condition[r.condition]}
                         </>
                       ) : (
-                        t.sell.accessoryAvailable(r.available)
+                        `${r.category === "PHONE" ? t.common.phone : t.common.accessory} · ${t.sell.inStockCount(r.available)}`
                       )}
                     </span>
                   </span>

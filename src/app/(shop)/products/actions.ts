@@ -50,12 +50,23 @@ function revalidateStock(productId?: string) {
   if (productId) revalidatePath(`/products/${productId}`);
 }
 
+const startingStockSchema = z.object({
+  quantity: z.coerce.number().int().min(0).max(1_000_000).catch(0),
+  costPrice: money.catch(0),
+});
+
 export async function createProduct(_prev: FormResult, formData: FormData): Promise<FormResult> {
   const t = await begin();
   const parsed = productSchema(t).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: firstError(parsed.error, t) };
 
-  const product = await db.product.create({ data: parsed.data });
+  // Accessories are always counted; phones are tracked by IMEI unless the box is unticked.
+  const trackImei = parsed.data.category === "PHONE" && formData.get("trackImei") === "on";
+  const stock = trackImei
+    ? { quantity: 0, costPrice: 0 }
+    : startingStockSchema.parse({ quantity: formData.get("quantity") || 0, costPrice: formData.get("costPrice") || 0 });
+
+  const product = await db.product.create({ data: { ...parsed.data, trackImei, ...stock } });
   revalidateStock();
   redirect(`/products/${product.id}`);
 }
@@ -65,7 +76,23 @@ export async function updateProduct(id: string, _prev: FormResult, formData: For
   const parsed = productSchema(t).omit({ category: true }).safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: firstError(parsed.error, t) };
 
-  await db.product.update({ where: { id }, data: parsed.data });
+  const current = await db.product.findUnique({ where: { id }, select: { category: true, trackImei: true, quantity: true } });
+  if (!current) return { error: t.common.invalidInput };
+
+  // Phones can switch between IMEI tracking and counting, but only with no stock
+  // on hand, so nothing is lost or counted twice.
+  let trackImei = current.trackImei;
+  if (current.category === "PHONE" && formData.get("trackImeiShown") === "1") {
+    trackImei = formData.get("trackImei") === "on";
+    if (trackImei !== current.trackImei) {
+      if (!trackImei && (await db.unit.count({ where: { productId: id, status: "IN_STOCK" } })) > 0) {
+        return { error: t.stockMsg.cantSwitchToCount };
+      }
+      if (trackImei && current.quantity > 0) return { error: t.stockMsg.cantSwitchToImei };
+    }
+  }
+
+  await db.product.update({ where: { id }, data: { ...parsed.data, trackImei } });
   revalidateStock(id);
   return { ok: t.stockMsg.saved };
 }
@@ -98,7 +125,7 @@ export async function restoreProduct(id: string, _prev: FormResult): Promise<For
 
 /** Stock can't be added to a deleted (archived) product. */
 async function assertActive(productId: string, t: Dictionary) {
-  const product = await db.product.findUnique({ where: { id: productId }, select: { archived: true, category: true } });
+  const product = await db.product.findUnique({ where: { id: productId }, select: { archived: true, trackImei: true } });
   if (!product) return { error: t.common.invalidInput };
   if (product.archived) return { error: t.stockMsg.archived };
   return { product };
@@ -121,7 +148,7 @@ export async function addUnits(productId: string, _prev: FormResult, formData: F
 
   const active = await assertActive(productId, t);
   if (!active.product) return { error: active.error };
-  if (active.product.category !== "PHONE") return { error: t.common.invalidInput };
+  if (!active.product.trackImei) return { error: t.common.invalidInput };
 
   const imeis = [...new Set(raw.split(/[\n,]+/).map(cleanImei).filter(Boolean))];
   if (imeis.length === 0) return { error: t.stockMsg.enterImei };
@@ -186,7 +213,7 @@ const receiveSchema = z.object({
   costPrice: money,
 });
 
-/** Receive accessory stock. Cost becomes the weighted average of old and new stock. */
+/** Receive counted (non-IMEI) stock. Cost becomes the weighted average of old and new stock. */
 export async function receiveAccessories(productId: string, _prev: FormResult, formData: FormData): Promise<FormResult> {
   const t = await begin();
   const parsed = receiveSchema.safeParse(Object.fromEntries(formData));
@@ -196,7 +223,7 @@ export async function receiveAccessories(productId: string, _prev: FormResult, f
   if (!active.product) return { error: active.error };
 
   await db.$transaction(async (tx) => {
-    const p = await tx.product.findUniqueOrThrow({ where: { id: productId, category: "ACCESSORY" } });
+    const p = await tx.product.findUniqueOrThrow({ where: { id: productId, trackImei: false } });
     const total = p.quantity + quantity;
     const avgCost = Math.round((p.quantity * p.costPrice + quantity * costPrice) / total);
     await tx.product.update({ where: { id: productId }, data: { quantity: total, costPrice: avgCost } });
@@ -212,7 +239,7 @@ export async function setAccessoryQuantity(productId: string, _prev: FormResult,
   if (!quantity.success) return { error: t.stockMsg.countInvalid };
   const active = await assertActive(productId, t);
   if (!active.product) return { error: active.error };
-  await db.product.update({ where: { id: productId, category: "ACCESSORY" }, data: { quantity: quantity.data } });
+  await db.product.update({ where: { id: productId, trackImei: false }, data: { quantity: quantity.data } });
   revalidateStock(productId);
   return { ok: t.stockMsg.countUpdated };
 }

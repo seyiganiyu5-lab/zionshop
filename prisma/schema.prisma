@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum Category {
+  PHONE
+  ACCESSORY
+}
+
+enum Condition {
+  NEW
+  USED
+  REFURBISHED
+}
+
+enum UnitStatus {
+  IN_STOCK
+  SOLD
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  CARD
+}
+
+/// A thing the shop sells, e.g. "iPhone 15 128GB Black" or "20W USB-C charger".
+/// Phones are tracked one unit at a time (by IMEI); accessories by quantity.
+model Product {
+  id                String     @id @default(cuid())
+  category          Category
+  brand             String
+  model             String
+  storage           String?
+  color             String?
+  sellPrice         Int
+  /// Accessories only: cost per item and quantity on hand.
+  costPrice         Int        @default(0)
+  quantity          Int        @default(0)
+  lowStockThreshold Int        @default(2)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  units             Unit[]
+  saleItems         SaleItem[]
+
+  @@index([brand, model])
+}
+
+/// A single physical phone.
+model Unit {
+  id        String     @id @default(cuid())
+  productId String
+  product   Product    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  imei      String     @unique
+  condition Condition  @default(NEW)
+  costPrice Int
+  supplier  String?
+  notes     String?
+  status    UnitStatus @default(IN_STOCK)
+  addedAt   DateTime   @default(now())
+  saleItem  SaleItem?
+
+  @@index([productId, status])
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  number        Int           @unique @default(autoincrement())
+  createdAt     DateTime      @default(now())
+  customerName  String?
+  customerPhone String?
+  paymentMethod PaymentMethod
+  total         Int
+  items         SaleItem[]
+
+  @@index([createdAt])
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  unitId    String? @unique
+  unit      Unit?   @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  quantity  Int
+  /// Prices are copied at time of sale so later price changes don't rewrite history.
+  unitPrice Int
+  costPrice Int
+}
